@@ -7,7 +7,8 @@ import multiprocessing as mp
 from typing import Dict, List, Sequence, Tuple, Union
 
 import gorilla
-import open3d as o3d
+# import open3d as o3d
+import plyfile
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -27,9 +28,15 @@ class GetSuperpoint(mp.Process):
 
     def run(self):
         mesh_file = os.path.join(os.path.join(self.path, self.scene, self.scene+"_vh_clean_2.ply"))
-        mesh = o3d.io.read_triangle_mesh(mesh_file)
-        vertices = torch.from_numpy(np.array(mesh.vertices).astype(np.float32))
-        faces = torch.from_numpy(np.array(mesh.triangles).astype(np.int64))
+        mesh = plyfile.PlyData().read(mesh_file)
+        vertices = torch.from_numpy(np.concatenate((
+            mesh['vertex']['x'][:, np.newaxis], mesh['vertex']['y'][:, np.newaxis], mesh['vertex']['z'][:, np.newaxis]),
+            axis=1).astype(np.float32))
+        faces = torch.from_numpy(np.concatenate(
+            [i[np.newaxis, :] for i in mesh['face']['vertex_indices']], axis=0).astype(np.int64))
+        # mesh = o3d.io.read_triangle_mesh(mesh_file)
+        # vertices = torch.from_numpy(np.array(mesh.vertices).astype(np.float32))
+        # faces = torch.from_numpy(np.array(mesh.triangles).astype(np.int64))
         superpoint = segmentator.segment_mesh(vertices, faces).numpy()
         self.mdict.update({self.scene: superpoint})        
 
@@ -97,9 +104,15 @@ class ScanNetV2Inst(Dataset):
             return
         sub_dir = "scans_test" if "test" in self.task else "scans"
         mesh_file = os.path.join(self.data_root, sub_dir, scene, scene+"_vh_clean_2.ply")
-        mesh = o3d.io.read_triangle_mesh(mesh_file)
-        vertices = torch.from_numpy(np.array(mesh.vertices).astype(np.float32))
-        faces = torch.from_numpy(np.array(mesh.triangles).astype(np.int64))
+        mesh = plyfile.PlyData().read(mesh_file)
+        vertices = torch.from_numpy(np.concatenate((
+            mesh['vertex']['x'][:, np.newaxis], mesh['vertex']['y'][:, np.newaxis], mesh['vertex']['z'][:, np.newaxis]),
+            axis=1).astype(np.float32))
+        faces = torch.from_numpy(np.concatenate(
+            [i[np.newaxis, :] for i in mesh['face']['vertex_indices']], axis=0).astype(np.int64))
+        # mesh = o3d.io.read_triangle_mesh(mesh_file)
+        # vertices = torch.from_numpy(np.array(mesh.vertices).astype(np.float32))
+        # faces = torch.from_numpy(np.array(mesh.triangles).astype(np.int64))
         superpoint = segmentator.segment_mesh(vertices, faces).numpy()
         self.superpoints[scene] = superpoint
 
